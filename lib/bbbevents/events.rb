@@ -38,7 +38,7 @@ module BBBEvents
         @attendees[extUserId] = Attendee.new(e) unless @attendees.key?(extUserId)
       end
 
-      join_ts = Time.at(timestamp_conversion(e["timestamp"]))
+      join_ts = Time.at(timestamp_conversion(e.dig("attributes", "timestamp")))
 
       # Handle updates for re-joining users
       att = @attendees[extUserId]
@@ -62,7 +62,7 @@ module BBBEvents
       intUserId = e['userId']
       # If the attendee exists, set their leave time.
       if att = @attendees[@externalUserId[intUserId]]
-        left_ts = Time.at(timestamp_conversion(e["timestamp"]))
+        left_ts = Time.at(timestamp_conversion(e.dig("attributes", "timestamp")))
         att.leaves << left_ts
 
         extUserId = 'missing'
@@ -73,7 +73,7 @@ module BBBEvents
         left_2 = {:timestamp => left_ts, :userid => intUserId, :ext_userid => extUserId, :event => :left}
         att.sessions[intUserId][:lefts] << left_2
 
-        record_stop_talking(att, e["timestamp"])
+        record_stop_talking(att, e.dig("attributes", "timestamp"))
       end
     end
 
@@ -115,9 +115,9 @@ module BBBEvents
 
       if e["talking"] == "true"
         attendee.engagement[:talks] += 1
-        attendee.recent_talking_time = timestamp_conversion(e["timestamp"])
+        attendee.recent_talking_time = timestamp_conversion(e.dig("attributes", "timestamp"))
       else
-        record_stop_talking(attendee, e["timestamp"])
+        record_stop_talking(attendee, e.dig("attributes", "timestamp"))
       end
     end
 
@@ -134,7 +134,7 @@ module BBBEvents
       return unless attendee = @attendees[@externalUserId[intUserId]]
 
       if e["muted"] == "true"
-        record_stop_talking(attendee, e["timestamp"])
+        record_stop_talking(attendee, e.dig("attributes", "timestamp"))
       end
     end
 
@@ -143,7 +143,7 @@ module BBBEvents
       id = e["pollId"]
 
       @polls[id] = Poll.new(e)
-      @polls[id].start = Time.at(timestamp_conversion(e["timestamp"]))
+      @polls[id].start = Time.at(timestamp_conversion(e.dig("attributes", "timestamp")))
     end
 
     # Log user responses to polls.
@@ -172,10 +172,10 @@ module BBBEvents
     def record_status_event(e)
       if e["status"] == "true"
         r = RecordedSegment.new
-        r.start = Time.at(timestamp_conversion(e["timestamp"]))
+        r.start = Time.at(timestamp_conversion(e.dig("attributes", "timestamp")))
         @recorded_segments << r
       else
-        @recorded_segments.last.stop = Time.at(timestamp_conversion(e["timestamp"]))
+        @recorded_segments.last.stop = Time.at(timestamp_conversion(e.dig("attributes", "timestamp")))
       end
     end
 

@@ -1,4 +1,4 @@
-require "bbbevents/base"
+require 'bbbevents/base'
 require 'bbbevents/version'
 require 'bbbevents/attendee'
 require 'bbbevents/events'

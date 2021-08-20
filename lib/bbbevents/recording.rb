@@ -1,6 +1,8 @@
 require 'csv'
 require 'json'
-require 'active_support/core_ext/hash'
+
+require 'bbbevents/custom_hash'
+require 'bbbevents/custom_string'
 
 module BBBEvents
   CSV_HEADER = %w(name moderator chats talks emojis poll_votes raisehand talk_time join left duration)
@@ -15,10 +17,8 @@ module BBBEvents
       filename = File.basename(events_xml)
       raise "#{filename} is not a file or does not exist." unless File.file?(events_xml)
 
-      # The Hash.from_xml automatically converts keys with dashes '-' to snake_case
-      # (i.e canvas-recording-ready-url becomes canvas_recording_ready_url)
-      # see https://www.rubydoc.info/github/datamapper/extlib/Hash.from_xml
-      raw_recording_data = Hash.from_xml(File.read(events_xml))
+      # use JSON.parse and to_json in order to transform recursively symbol keys into string
+      raw_recording_data = JSON.parse(Hash.from_xml(File.read(events_xml)).to_json)
 
       raise "#{filename} is not a valid xml file (unable to parse)." if raw_recording_data.nil?
       raise "#{filename} is missing recording key." unless raw_recording_data.key?("recording")
@@ -28,17 +28,17 @@ module BBBEvents
       events = [] if events.nil?
       events = [events] unless events.is_a?(Array)
 
-      @metadata   = recording_data["metadata"]
-      @meeting_id = recording_data["metadata"]["meetingId"]
+      @metadata   = recording_data.dig("metadata", "attributes")
+      @meeting_id = recording_data.dig("metadata", "attributes", "meetingId")
 
-      internal_meeting_id = recording_data["meeting"]["id"]
+      internal_meeting_id = recording_data.dig("meeting", "attributes", "id")
 
       @timestamp  = extract_timestamp(internal_meeting_id)
       @start = Time.at(@timestamp / 1000)
 
       if events.length > 0
-        @first_event = events.first["timestamp"].to_i
-        @last_event  = events.last["timestamp"].to_i
+        @first_event = events.first.dig("attributes", "timestamp").to_i
+        @last_event  = events.last.dig("attributes", "timestamp").to_i
         @finish = Time.at(timestamp_conversion(@last_event))
       else
         @finish = @start
@@ -350,7 +350,7 @@ module BBBEvents
     # Process all the events in the events.xml file.
     def process_events(events)
       events.each do |e|
-        event = e["eventname"].underscore
+        event = e.dig("attributes", "eventname").underscore
         send(event, e) if RECORDABLE_EVENTS.include?(event)
       end
     end
