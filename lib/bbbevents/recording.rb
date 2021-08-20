@@ -46,7 +46,7 @@ module BBBEvents
       @duration = (@finish - @start).to_i
 
       @attendees         = {}
-      @transfer_attendees = []
+      @transfer_attendees = {}
       @polls             = {}
       @files             = []
       @recorded_segments = []
@@ -58,6 +58,11 @@ module BBBEvents
       process_events(events)
 
       @attendees.values.each do |att|
+        att.leaves << @finish if att.joins.length > att.leaves.length
+        att.duration = total_duration(@finish, att)
+      end
+
+      @transfer_attendees.values.each do |att|
         att.leaves << @finish if att.joins.length > att.leaves.length
         att.duration = total_duration(@finish, att)
       end
@@ -98,7 +103,7 @@ module BBBEvents
     end
 
     def transfer_attendees
-      @transfer_attendees
+      @transfer_attendees.values
     end
 
     # Export recording data to a CSV file.
