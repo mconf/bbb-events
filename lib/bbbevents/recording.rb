@@ -117,12 +117,6 @@ module BBBEvents
     end
 
     def to_h
-      # Transform any CamelCase keys to snake_case.
-      @metadata.deep_transform_keys! do |key|
-          k = key.to_s.underscore rescue key
-          k.to_sym rescue key
-        end
-
       {
         metadata: @metadata,
         meeting_id: @meeting_id,
