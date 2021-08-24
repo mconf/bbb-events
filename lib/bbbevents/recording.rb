@@ -77,6 +77,10 @@ module BBBEvents
       @attendees.values
     end
 
+    def transfer_attendees
+      @transfer_attendees.values
+    end
+
     # Retrieve a list of all the moderators.
     def moderators
       attendees.select(&:moderator?)
@@ -127,7 +131,7 @@ module BBBEvents
         files: @files,
         polls: polls.map(&:to_h),
         recorded_segments: @recorded_segments.map(&:to_h),
-        transfer_attendees: @transfer_attendees,
+        transfer_attendees: transfer_attendees.map(&:to_h),
       }
     end
 
