@@ -44,7 +44,7 @@ module BBBEvents
       # Handle updates for re-joining users
       att = @attendees[extUserId]
       att.joins << join_ts
-      att.name = e['name']
+      att.name = e['name'].to_s
       if e['role'] == 'MODERATOR'
         att.moderator = true
       end
@@ -200,7 +200,7 @@ module BBBEvents
       # Handle updates for re-joining users
       att = @transfer_attendees[extUserId]
       att.joins << join_ts
-      att.name = e['name']
+      att.name = e['name'].to_s
 
       join_2 = {:timestamp => join_ts, :userid => intUserId, :ext_userid => extUserId, :event => :join}
 
