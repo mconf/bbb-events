@@ -9,7 +9,7 @@ module BBBEvents
   class Recording
     include Events
 
-    attr_accessor :metadata, :meeting_id, :timestamp, :start, :finish, :duration, :files
+    attr_accessor :metadata, :meeting_id, :timestamp, :start, :finish, :duration, :files, :recorded_segments
 
     def initialize(events_xml)
       filename = File.basename(events_xml)
@@ -48,6 +48,8 @@ module BBBEvents
       @attendees = {}
       @polls     = {}
       @files     = []
+      @transfer_attendees = {}
+      @recorded_segments  = []
 
       # Map to look up external user id (for @data[:attendees]) from the
       # internal user id in most recording events
@@ -59,11 +61,24 @@ module BBBEvents
         att.leaves << @finish if att.joins.length > att.leaves.length
         att.duration = total_duration(@finish, att)
       end
+
+      @transfer_attendees.values.each do |att|
+        att.leaves << @finish if att.joins.length > att.leaves.length
+        att.duration = total_duration(@finish, att)
+      end
+
+      if ! @recorded_segments.empty? and @recorded_segments.last.stop.nil?
+        @recorded_segments.last.stop = @finish
+      end
     end
 
     # Take only the values since we no longer need to index.
     def attendees
       @attendees.values
+    end
+
+    def transfer_attendees
+      @transfer_attendees.values
     end
 
     # Retrieve a list of all the moderators.
@@ -91,6 +106,10 @@ module BBBEvents
       polls.reject(&:published?)
     end
 
+    def transfer_attendees
+      @transfer_attendees.values
+    end
+
     # Export recording data to a CSV file.
     def create_csv(filepath)
       CSV.open(filepath, "wb") do |csv|
@@ -116,7 +135,9 @@ module BBBEvents
         finish: @finish,
         attendees: attendees.map(&:to_h),
         files: @files,
-        polls: polls.map(&:to_h)
+        polls: polls.map(&:to_h),
+        recorded_segments: @recorded_segments.map(&:to_h),
+        transfer_attendees: transfer_attendees.map(&:to_h),
       }
     end
 

@@ -11,6 +11,10 @@ module BBBEvents
       "poll_started_record_event",
       "user_responded_to_poll_record_event",
       "add_shape_event",
+      "record_status_event",
+      "user_connected_to_transfer_event",
+      "user_disconnected_from_transfer_event",
+      "question_created_event",
     ]
 
     EMOJI_WHITELIST = %w(away neutral confused sad happy applause thumbsUp thumbsDown)
@@ -40,7 +44,7 @@ module BBBEvents
       # Handle updates for re-joining users
       att = @attendees[extUserId]
       att.joins << join_ts
-      att.name = e['name']
+      att.name = e['name'].to_s
       if e['role'] == 'MODERATOR'
         att.moderator = true
       end
@@ -164,6 +168,72 @@ module BBBEvents
           poll.published = true
         end
       end
+    end
+
+    def record_status_event(e)
+      if e["status"] == "true"
+        r = RecordedSegment.new
+        r.start = Time.at(timestamp_conversion(e["timestamp"]))
+        @recorded_segments << r
+      else
+        @recorded_segments.last.stop = Time.at(timestamp_conversion(e["timestamp"]))
+      end
+    end
+
+    def user_connected_to_transfer_event(e)
+      intUserId = e['userId']
+      extUserId = e['externalUserId']
+
+      # If they don't exist, initialize the user.
+      unless @externalUserId.key?(intUserId)
+        @externalUserId[intUserId] = extUserId
+      end
+
+      # We need to track the user using external userids so that 3rd party
+      # integrations will be able to correlate the users with their own data.
+      unless @transfer_attendees.key?(extUserId)
+        @transfer_attendees[extUserId] = TransferAttendee.new(e) unless @transfer_attendees.key?(extUserId)
+      end
+
+      join_ts = Time.at(timestamp_conversion(e["timestamp"]))
+
+      # Handle updates for re-joining users
+      att = @transfer_attendees[extUserId]
+      att.joins << join_ts
+      att.name = e['name'].to_s
+
+      join_2 = {:timestamp => join_ts, :userid => intUserId, :ext_userid => extUserId, :event => :join}
+
+      unless att.sessions.key?(intUserId)
+        att.sessions[intUserId] = { :joins => [], :lefts => []}
+      end
+
+      att.sessions[intUserId][:joins] << join_2
+    end
+
+    def user_disconnected_from_transfer_event(e)
+      intUserId = e['userId']
+      # If the attendee exists, set their leave time.
+      if att = @transfer_attendees[@externalUserId[intUserId]]
+        left_ts = Time.at(timestamp_conversion(e["timestamp"]))
+        att.leaves << left_ts
+
+        extUserId = 'missing'
+        if @externalUserId.key?(intUserId)
+          extUserId = @externalUserId[intUserId]
+        end
+
+        left_2 = {:timestamp => left_ts, :userid => intUserId, :ext_userid => extUserId, :event => :left}
+        att.sessions[intUserId][:lefts] << left_2
+      end
+    end
+
+    def question_created_event(e)
+      intUserId = e['userId']
+
+      return unless attendee = @attendees[@transfer_attendees[intUserId]]
+
+      attendee.engagement[:questions] += 1
     end
   end
 end
