@@ -171,7 +171,8 @@ module BBBEvents
       joins_lefts_arr = build_join_lefts_array(last_event_ts, sessions)
 
       # sort the events
-      joins_lefts_arr_sorted = joins_lefts_arr.sort_by { |event| event[:timestamp] }
+      # if it's the same timestamp, left comes first
+      joins_lefts_arr_sorted = joins_lefts_arr.sort_by { |event| [ event[:timestamp], event[:event] == :left ? -1 : 1 ] }
 
       combined_tuples = combine_tuples_by_userid(sessions)
       combined_tuples_sorted = fill_missing_left_events(combined_tuples)
