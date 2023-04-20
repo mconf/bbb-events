@@ -1,5 +1,3 @@
-
-
 module BBBEvents
   class TransferAttendee < Attendee
     def initialize(join_event)
