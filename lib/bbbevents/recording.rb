@@ -234,7 +234,13 @@ module BBBEvents
           unless joins_lefts_arr_sorted_length == i
             # Take the next event as the left event for this current event
             next_event = joins_lefts_arr_sorted[i + 1]
-            left_event = {:timestamp => next_event[:timestamp], :userid => cur_event[:userid], :event => :left}
+            
+            # only match if it's the same userId
+            if cur_event[:join][:userid] == next_event[:join][:userid]
+              left_event = {:timestamp => next_event[:join][:timestamp], :userid => cur_event[:join][:userid] , :event => :left}
+            else
+              left_event = {:timestamp => @finish, :userid => cur_event[:join][:userid], :event => :left}
+            end
 
             cur_event[:left] = left_event
           end
