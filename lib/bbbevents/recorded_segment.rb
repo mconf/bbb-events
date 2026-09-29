@@ -18,10 +18,16 @@ module BBBEvents
       hash
     end
 
+    def as_json
+      {
+        start: BBBEvents.format_datetime(@start),
+        stop: BBBEvents.format_datetime(@stop),
+        duration: @duration,
+      }
+    end
+
     def to_json
-      hash = {}
-      instance_variables.each { |var| hash[var[1..-1]] = instance_variable_get(var) }
-      hash.to_json
+      JSON.generate(as_json)
     end
   end
 end

@@ -135,8 +135,23 @@ module BBBEvents
       }
     end
 
+    def as_json
+      {
+        metadata: @metadata,
+        meeting_id: @meeting_id,
+        duration: @duration,
+        start: BBBEvents.format_datetime(@start),
+        finish: BBBEvents.format_datetime(@finish),
+        attendees: attendees.map(&:as_json),
+        files: @files,
+        polls: polls.map(&:as_json),
+        recorded_segments: @recorded_segments.map(&:as_json),
+        transfer_attendees: transfer_attendees.map(&:as_json),
+      }
+    end
+
     def to_json
-      to_h.to_json
+      JSON.generate(as_json)
     end
 
     def calculate_user_duration(join_events, left_events)

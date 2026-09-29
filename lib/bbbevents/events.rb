@@ -15,6 +15,7 @@ module BBBEvents
       "user_connected_to_transfer_event",
       "user_disconnected_from_transfer_event",
       "question_created_event",
+      "poll_published_record_event",
     ]
 
     EMOJI_WHITELIST = %w(away neutral confused sad happy applause thumbsUp thumbsDown)
@@ -97,12 +98,21 @@ module BBBEvents
       intUserId = e['userId']
 
       return unless attendee = @attendees[@externalUserId[intUserId]]
-      status = e["value"]
+      status = e["status"]
+      status_value = e['value']
 
       if attendee
-        if status == RAISEHAND
+        # Support new event format
+        if status == RAISEHAND && status_value == 'true'
+          # Count only raise hand event and not lower hand
           attendee.engagement[:raisehand] += 1
-        elsif EMOJI_WHITELIST.include?(status)
+        elsif status == 'reactionEmoji' && status_value != 'none'
+          attendee.engagement[:emojis] += 1
+
+        # Support old event format
+        elsif  status_value == RAISEHAND
+          attendee.engagement[:raisehand] += 1
+        elsif EMOJI_WHITELIST.include?(status_value)
           attendee.engagement[:emojis] += 1
         end
       end
@@ -155,6 +165,12 @@ module BBBEvents
       return unless attendee = @attendees[@externalUserId[intUserId]]
 
       if poll = @polls[poll_id]
+        if poll.type == 'R-'
+          poll.votes[@externalUserId[intUserId]] = e["answer"]
+
+          # We want to store the responses as options.
+          poll.options.insert(e["answerId"].to_i, e["answer"])
+        end
         poll.votes[@externalUserId[intUserId]] = poll.options[e["answerId"].to_i]
       end
 
@@ -170,13 +186,20 @@ module BBBEvents
       end
     end
 
+    # Track the periods in which the meeting was being recorded. A start while
+    # already recording and a stop while not recording are ignored.
     def record_status_event(e)
+      timestamp = Time.at(timestamp_conversion(e.dig("attributes", "timestamp")))
+      recording = @recorded_segments.any? && @recorded_segments.last.stop.nil?
+
       if e["status"] == "true"
-        r = RecordedSegment.new
-        r.start = Time.at(timestamp_conversion(e.dig("attributes", "timestamp")))
-        @recorded_segments << r
-      else
-        @recorded_segments.last.stop = Time.at(timestamp_conversion(e.dig("attributes", "timestamp")))
+        unless recording
+          segment = RecordedSegment.new
+          segment.start = timestamp
+          @recorded_segments << segment
+        end
+      elsif recording
+        @recorded_segments.last.stop = timestamp
       end
     end
 
@@ -234,6 +257,14 @@ module BBBEvents
       return unless attendee = @attendees[@transfer_attendees[intUserId]]
 
       attendee.engagement[:questions] += 1
+    end
+
+    def poll_published_record_event(e)
+      unless e["pollId"].nil?
+        if poll = @polls[e["pollId"]]
+          poll.published = true
+        end
+      end
     end
   end
 end

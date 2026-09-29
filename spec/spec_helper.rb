@@ -1,4 +1,6 @@
 require "bundler/setup"
+require "tempfile"
+require "time"
 require "bbbevents"
 
 RSpec.configure do |config|

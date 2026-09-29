@@ -3,12 +3,13 @@ require "spec_helper"
 RSpec.describe BBBEvents::Recording do
   context "#metadata" do
     it "should properly parse metadata." do
+      # Attribute names are kept as they are in events.xml
       expect(@sample.metadata).to eql({
-        "gl_listed": "false",
-        isBreakout: "false",
-        meetingName: "Home Room",
-        meetingId: "ae5e285551844c61c757f4c8f233850a2e0b16bf",
-      }.with_indifferent_access)
+        "gl-listed" => "false",
+        "isBreakout" => "false",
+        "meetingName" => "Home Room",
+        "meetingId" => "ae5e285551844c61c757f4c8f233850a2e0b16bf",
+      })
     end
   end
 
@@ -129,6 +130,46 @@ RSpec.describe BBBEvents::Recording do
 
     it "should determine recorded segment duration." do
       expect(@sample.recorded_segments.first.duration).to eql(67)
+    end
+
+    # Parses an events.xml with the given RecordStatusEvents, as [timestamp, status]
+    # pairs, for a meeting that starts at 2017-07-14 02:40:00 UTC and lasts 9s.
+    def recording_with_statuses(*statuses)
+      events = statuses.map do |timestamp, status|
+        %(<event timestamp="#{timestamp}" module="PARTICIPANT" eventname="RecordStatusEvent"><userId>w_1</userId><status>#{status}</status></event>)
+      end
+      file = Tempfile.new(["events", ".xml"])
+      file.write(<<~XML)
+        <?xml version="1.0" encoding="UTF-8"?>
+        <recording meeting_id="abc-1500000000000" bbb_version="2.6.0">
+          <metadata meetingId="abc" meetingName="Test"/>
+          <meeting id="abc-1500000000000" externalId="abc" name="Test" breakout="false"/>
+          <event timestamp="0" module="PARTICIPANT" eventname="ParticipantJoinEvent"><userId>w_1</userId><externalUserId>u1</externalUserId><name>User</name><role>MODERATOR</role></event>
+          #{events.join("\n")}
+          <event timestamp="9000" module="PARTICIPANT" eventname="EndAndKickAllEvent"/>
+        </recording>
+      XML
+      file.close
+      BBBEvents.parse(file.path)
+    ensure
+      file&.unlink
+    end
+
+    it "should ignore a start while recording and a stop while not recording." do
+      recording = recording_with_statuses([500, false], [1000, true], [2000, true], [4000, false], [5000, false], [7000, true])
+
+      meeting_start = Time.parse("2017-07-14 02:40:00 UTC")
+      expect(recording.recorded_segments.map { |s| [s.start - meeting_start, s.stop - meeting_start] }).to eql([[1.0, 4.0], [7.0, 9.0]])
+      expect(recording.recorded_segments.map(&:duration)).to eql([3, 2])
+    end
+
+    it "should include recorded segments in the recording JSON." do
+      segment = JSON.parse(@sample.to_json)["recorded_segments"].first
+
+      expect(segment["start"]).to match(/\A\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}[+-]\d\d:\d\d\z/)
+      expect(Time.parse(segment["start"])).to eql(Time.parse("2018-08-16 15:39:47 UTC"))
+      expect(Time.parse(segment["stop"])).to eql(Time.parse("2018-08-16 15:40:54 UTC"))
+      expect(segment["duration"]).to eql(67)
     end
   end
 
